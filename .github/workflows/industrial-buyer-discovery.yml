@@ -7,7 +7,7 @@ on:
         required: false
         default: "35"
   schedule:
-    - cron: "30 4 * * 1-5"
+    - cron: "30 4 * * *"
 permissions:
   contents: read
 concurrency:
@@ -66,19 +66,23 @@ jobs:
           token=os.environ.get("TELEGRAM_BOT_TOKEN","")
           chat=os.environ.get("TELEGRAM_CHAT_ID","")
           if not token or not chat:
-              print("Telegram secrets missing; report not sent.")
+              print("::warning::Telegram secrets are unavailable to this workflow run; report not sent. Check repository Actions secrets.")
               raise SystemExit(0)
           try:
               with open("output/run-summary.json",encoding="utf-8") as f: s=json.load(f)
           except Exception: s={"status":"failed","error":"Summary missing"}
-          ok=os.environ.get("JOB_STATUS")=="success" and s.get("status")=="success"
-          msg=("KeeLead: "+("SUCCESS" if ok else "FAILED")+"\n"
+          run_ok=os.environ.get("JOB_STATUS")=="success"
+          status=s.get("status","failed")
+          label="SUCCESS" if run_ok and status=="success" else ("PARTIAL" if run_ok and status=="partial" else "FAILED")
+          healthy=[x.get("engine") for x in s.get("engineHealth",[]) if x.get("available")]
+          msg=("KeeLead: "+label+"\n"
                +"Country: "+str(s.get("country","Iran"))+"\n"
                +"New: "+str(s.get("newLeads",0))+" | Duplicates: "+str(s.get("duplicates",0))+"\n"
                +"Found: "+str(s.get("discoveredThisRun",0))+" | Total: "+str(s.get("cumulativeLeads",0))+"\n"
                +"Medium confidence: "+str(s.get("mediumConfidence",0))+" | Low: "+str(s.get("lowConfidence",0))+"\n"
                +"Email: "+str(s.get("withEmail",0))+" | Phone: "+str(s.get("withPhone",0))+" | Evidence: "+str(s.get("withEvidence",0))+"\n"
                +"Searches: "+str(s.get("searchesRun",0))+" | Errors: "+str(s.get("searchErrors",0))+"\n"
+               +"Search engines: "+(", ".join(healthy) if healthy else "NONE AVAILABLE")+"\n"
                +"Run: "+os.environ.get("RUN_URL",""))
           if s.get("error"): msg+="\nError: "+str(s["error"])[:700]
           data=json.dumps({"chat_id":chat,"text":msg,"disable_web_page_preview":True}).encode()
