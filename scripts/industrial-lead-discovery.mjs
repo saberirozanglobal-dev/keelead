@@ -40,7 +40,7 @@ function parseDuck(html){
  const out=[];for(const m of html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)){
   const href=m[1].match(/\bhref=["']([^"']+)["']/i);if(!href)continue;
   let url=href[1];try{const u=new URL(url,"https://html.duckduckgo.com");if(u.searchParams.has("uddg"))url=u.searchParams.get("uddg");}catch{}
-  const title=clean(m[2]);if(title&&/^https?:/i.test(url))out.push({title,url,content:""});
+  const title=clean(m[2]);const tail=html.slice(m.index,m.index+5000);const sm=tail.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\\s\\S]*?)<\\/(?:a|div|td|span)>/i);const content=sm?clean(sm[1]):"";if(title&&/^https?:/i.test(url))out.push({title,url,content});
  }
  return out;
  return out;
@@ -55,16 +55,23 @@ async function probeEngines(){
   {name:"DuckDuckGo HTML",search:async query=>{const r=await get("https://html.duckduckgo.com/html/?q="+encodeURIComponent(query),"text/html");return parseDuck(await r.text());}},
   {name:"Bing RSS",search:async query=>{const r=await get("https://www.bing.com/search?format=rss&q="+encodeURIComponent(query),"application/rss+xml,application/xml,text/xml");return parseBing(await r.text());}}
  ];
- const results=await Promise.all(checks.map(async e=>{try{const rows=await e.search(q);return {engine:e,ok:true,count:rows.length}}catch(err){return {engine:e,ok:false,error:String(err.message||err)}}}));
+ const results=await Promise.all(checks.map(async e=>{try{const rows=await e.search(q);return {engine:e,ok:rows.length>0,count:rows.length,error:rows.length?null:"No parseable results from probe"}}catch(err){return {engine:e,ok:false,error:String(err.message||err)}}}));
  for(const r of results){if(r.ok)engines.push(r.engine);}
  return results.map(r=>({engine:r.engine.name,available:r.ok,resultCount:r.count||0,error:r.error||null}));
 }
 async function search(q,diagnostics){
+ let hadValidResponse=false,lastEngine=null;
  for(const engine of engines){
-  try{const rows=await engine.search(q);diagnostics.successes[engine.name]=(diagnostics.successes[engine.name]||0)+1;return {results:rows,engine:engine.name,ok:true};}
-  catch(err){diagnostics.failures[engine.name]=(diagnostics.failures[engine.name]||0)+1;diagnostics.lastErrors[engine.name]=String(err.message||err).slice(0,180);}
+  try{
+   const rows=await engine.search(q);diagnostics.successes[engine.name]=(diagnostics.successes[engine.name]||0)+1;
+   hadValidResponse=true;lastEngine=engine.name;
+   if(rows.length)return {results:rows,engine:engine.name,ok:true};
+  }catch(err){
+   diagnostics.failures[engine.name]=(diagnostics.failures[engine.name]||0)+1;
+   diagnostics.lastErrors[engine.name]=String(err.message||err).slice(0,180);
+  }
  }
- return {results:[],engine:null,ok:false};
+ return {results:[],engine:lastEngine,ok:hadValidResponse};
 }
 async function inspect(url){
  const out={emails:[],phones:[],title:""};
