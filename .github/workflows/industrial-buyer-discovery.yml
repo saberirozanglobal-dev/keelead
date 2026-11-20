@@ -1,0 +1,90 @@
+name: KeeLead Industrial Buyer Discovery
+on:
+  workflow_dispatch:
+    inputs:
+      max_site_inspections:
+        description: Maximum company websites to inspect for public contact details
+        required: false
+        default: "35"
+  schedule:
+    - cron: "30 4 * * 1-5"
+permissions:
+  contents: read
+concurrency:
+  group: keelead-industrial-discovery
+  cancel-in-progress: false
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MAX_SITE_INSPECTIONS: ${{ github.event.inputs.max_site_inspections || '35' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Restore deduplication state
+        uses: actions/cache/restore@v4
+        with:
+          path: data/leads-state.json
+          key: keelead-leads-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            keelead-leads-state-
+      - name: Initialize failure summary
+        run: |
+          mkdir -p output data
+          printf '{"status":"failed","error":"Discovery did not start"}\n' > output/run-summary.json
+      - name: Validate discovery script syntax
+        run: node --check scripts/industrial-lead-discovery.mjs
+      - name: Run industrial buyer discovery
+        run: node scripts/industrial-lead-discovery.mjs
+      - name: Save deduplication state
+        if: always() && hashFiles('data/leads-state.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: data/leads-state.json
+          key: keelead-leads-state-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: keelead-results-${{ github.run_id }}
+          path: output/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Send Telegram report
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          token=os.environ.get("TELEGRAM_BOT_TOKEN","")
+          chat=os.environ.get("TELEGRAM_CHAT_ID","")
+          if not token or not chat:
+              print("Telegram secrets missing; report not sent.")
+              raise SystemExit(0)
+          try:
+              with open("output/run-summary.json",encoding="utf-8") as f: s=json.load(f)
+          except Exception: s={"status":"failed","error":"Summary missing"}
+          ok=os.environ.get("JOB_STATUS")=="success" and s.get("status")=="success"
+          msg=("KeeLead: "+("SUCCESS" if ok else "FAILED")+"\n"
+               +"Country: "+str(s.get("country","Iran"))+"\n"
+               +"New: "+str(s.get("newLeads",0))+" | Duplicates: "+str(s.get("duplicates",0))+"\n"
+               +"Found: "+str(s.get("discoveredThisRun",0))+" | Total: "+str(s.get("cumulativeLeads",0))+"\n"
+               +"Medium confidence: "+str(s.get("mediumConfidence",0))+" | Low: "+str(s.get("lowConfidence",0))+"\n"
+               +"Email: "+str(s.get("withEmail",0))+" | Phone: "+str(s.get("withPhone",0))+" | Evidence: "+str(s.get("withEvidence",0))+"\n"
+               +"Searches: "+str(s.get("searchesRun",0))+" | Errors: "+str(s.get("searchErrors",0))+"\n"
+               +"Run: "+os.environ.get("RUN_URL",""))
+          if s.get("error"): msg+="\nError: "+str(s["error"])[:700]
+          data=json.dumps({"chat_id":chat,"text":msg,"disable_web_page_preview":True}).encode()
+          req=urllib.request.Request("https://api.telegram.org/bot"+token+"/sendMessage",data=data,headers={"Content-Type":"application/json"})
+          with urllib.request.urlopen(req,timeout=20) as response:
+              result=json.loads(response.read().decode())
+              if not result.get("ok"): raise RuntimeError("Telegram API returned ok=false")
+          print("Telegram report sent.")
+          PY
