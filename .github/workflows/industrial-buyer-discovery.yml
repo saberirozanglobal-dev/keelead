@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      MAX_SITE_INSPECTIONS: \${{ github.event.inputs.max_site_inspections || '35' }}
+      MAX_SITE_INSPECTIONS: ${{ github.event.inputs.max_site_inspections || '35' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,7 +28,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/leads-state.json
-          key: keelead-leads-state-\${{ github.run_id }}-\${{ github.run_attempt }}
+          key: keelead-leads-state-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             keelead-leads-state-
       - name: Initialize failure summary
@@ -44,22 +44,22 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/leads-state.json
-          key: keelead-leads-state-\${{ github.run_id }}-\${{ github.run_attempt }}
+          key: keelead-leads-state-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Upload run artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: keelead-results-\${{ github.run_id }}
+          name: keelead-results-${{ github.run_id }}
           path: output/
           if-no-files-found: warn
           retention-days: 90
       - name: Send Telegram report
         if: always()
         env:
-          TELEGRAM_BOT_TOKEN: \${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: \${{ secrets.TELEGRAM_CHAT_ID }}
-          JOB_STATUS: \${{ job.status }}
-          RUN_URL: \${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           python3 - <<'PY'
           import json, os, urllib.request
