@@ -35,6 +35,8 @@ jobs:
         run: |
           mkdir -p output data
           printf '{"status":"failed","error":"Discovery did not start"}\n' > output/run-summary.json
+      - name: Validate discovery script syntax
+        run: node --check scripts/industrial-lead-discovery.mjs
       - name: Run industrial buyer discovery
         run: node scripts/industrial-lead-discovery.mjs
       - name: Save deduplication state
