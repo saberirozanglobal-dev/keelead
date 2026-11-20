@@ -58,8 +58,8 @@ async function main(){
    if(SELLER.test(title)&&!MAKER.test(evidence))continue;
    const company=title.split(/\s+[|–—]\s+|\s+-\s+/)[0].trim()||d.split(".")[0];
    if(company.length<3||/^(home|official website|contact|about us)$/i.test(company))continue;
-   const row={company,domain:d,product:task.p.label,productKey:task.p.key,country:/\\b(Iran|Iranian)\\b|ایران/i.test(evidence)?COUNTRY:"Unverified",city:evidence.toLowerCase().includes(task.city.toLowerCase())?task.city:"Unverified",
-    location_evidence:[/\\b(Iran|Iranian)\\b|ایران/i.test(evidence)?"Iran mentioned in result":null,evidence.toLowerCase().includes(task.city.toLowerCase())?task.city+" mentioned in result":null].filter(Boolean).join("; "),industry_evidence:(evidence.match(INDUSTRY)||[])[0]||task.industry,website:"https://"+d,evidence_url:item.url,
+   const row={company,domain:d,product:task.p.label,productKey:task.p.key,country:/\b(Iran|Iranian)\b|ایران/i.test(evidence)?COUNTRY:"Unverified",city:evidence.toLowerCase().includes(task.city.toLowerCase())?task.city:"Unverified",
+    location_evidence:[/\b(Iran|Iranian)\b|ایران/i.test(evidence)?"Iran mentioned in result":null,evidence.toLowerCase().includes(task.city.toLowerCase())?task.city+" mentioned in result":null].filter(Boolean).join("; "),industry_evidence:(evidence.match(INDUSTRY)||[])[0]||task.industry,website:"https://"+d,evidence_url:item.url,
     evidence_title:title,evidence_snippet:snippet.slice(0,450),emails:[],phones:[],source:"SearXNG",first_seen:START,
     confidence:MAKER.test(evidence)?"medium":"low",
     notes:"Potential industrial end-user only; verify actual material consumption and purchasing authority."};
