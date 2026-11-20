@@ -31,7 +31,7 @@ async function get(url,accept){
 }
 function parseBing(xml){
  const out=[];for(const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
-  const b=m[1],field=n=>{const x=b.match(new RegExp("<"+n+"[^>]*>([\\\\s\\\\S]*?)</"+n+">","i"));return x?clean(x[1].replace(/<!\[CDATA\[|\]\]>/g,"")):""};
+  const b=m[1],field=n=>{const x=b.match(new RegExp("<"+n+"[^>]*>([\s\S]*?)</"+n+">","i"));return x?clean(x[1].replace(/<!\[CDATA\[|\]\]>/g,"")):""};
   const title=field("title"),url=field("link"),content=field("description");
   if(title&&url)out.push({title,url,content});
  }return out;
@@ -42,7 +42,7 @@ function parseDuck(html){
   let url=href[1];try{const u=new URL(url,"https://html.duckduckgo.com");if(u.searchParams.has("uddg"))url=u.searchParams.get("uddg");}catch{}
   const title=clean(m[2]);if(title&&/^https?:/i.test(url))out.push({title,url,content:""});
  }
- for(const r of out){const d=html.match(new RegExp('class=["\\\'][^"\\\']*result__snippet[^"\\\']*["\\\'][^>]*>([\\\\s\\\\S]*?)<\\\\/','i'));if(d)r.content=clean(d[1]);}
+ return out;
  return out;
 }
 function parseSearx(data){return Array.isArray(data.results)?data.results.filter(x=>x?.title&&x?.url).map(x=>({title:clean(x.title),url:x.url,content:clean(x.content||"")})):[];}
