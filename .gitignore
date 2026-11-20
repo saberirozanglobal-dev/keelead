@@ -39,3 +39,7 @@ prisma/keelead.db-journal
 
 # cli
 *.log
+
+# KeeLead Actions output and persisted lead state
+/output/
+/data/leads-state.json
