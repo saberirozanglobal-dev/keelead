@@ -58,8 +58,8 @@ async function main(){
    if(SELLER.test(title)&&!MAKER.test(evidence))continue;
    const company=title.split(/\s+[|–—]\s+|\s+-\s+/)[0].trim()||d.split(".")[0];
    if(company.length<3||/^(home|official website|contact|about us)$/i.test(company))continue;
-   const row={company,domain:d,product:task.p.label,productKey:task.p.key,country:COUNTRY,city:task.city,
-    industry_evidence:(evidence.match(INDUSTRY)||[])[0]||task.industry,website:"https://"+d,evidence_url:item.url,
+   const row={company,domain:d,product:task.p.label,productKey:task.p.key,country:/\\b(Iran|Iranian)\\b|ایران/i.test(evidence)?COUNTRY:"Unverified",city:evidence.toLowerCase().includes(task.city.toLowerCase())?task.city:"Unverified",
+    location_evidence:[/\\b(Iran|Iranian)\\b|ایران/i.test(evidence)?"Iran mentioned in result":null,evidence.toLowerCase().includes(task.city.toLowerCase())?task.city+" mentioned in result":null].filter(Boolean).join("; "),industry_evidence:(evidence.match(INDUSTRY)||[])[0]||task.industry,website:"https://"+d,evidence_url:item.url,
     evidence_title:title,evidence_snippet:snippet.slice(0,450),emails:[],phones:[],source:"SearXNG",first_seen:START,
     confidence:MAKER.test(evidence)?"medium":"low",
     notes:"Potential industrial end-user only; verify actual material consumption and purchasing authority."};
@@ -83,7 +83,7 @@ async function main(){
   p.evidence_url=r.evidence_url;p.evidence_title=r.evidence_title;p.evidence_snippet=r.evidence_snippet;
  }}
  const all=[...merged.values()];fs.writeFileSync(STATE,JSON.stringify(all,null,2));
- const cols=["company","product","country","city","industry_evidence","website","evidence_url","evidence_title","evidence_snippet","emails","phones","source","first_seen","confidence","notes"];
+ const cols=["company","product","country","city","location_evidence","industry_evidence","website","evidence_url","evidence_title","evidence_snippet","emails","phones","source","first_seen","confidence","notes"];
  fs.writeFileSync(CSV,[cols.join(","),...fresh.map(r=>cols.map(c=>csv(Array.isArray(r[c])?r[c].join("; "):r[c])).join(","))].join("\n")+"\n");
  const summary={status:"success",startedAt:START,finishedAt:new Date().toISOString(),country:COUNTRY,products:PRODUCTS.map(p=>p.label),
   searchesRun,searchErrors,inspectedSites:inspected,discoveredThisRun:discovered.length,newLeads:fresh.length,duplicates:discovered.length-fresh.length,
