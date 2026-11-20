@@ -6,11 +6,11 @@ const OUT="output", STATE="data/leads-state.json", SUMMARY=path.join(OUT,"run-su
 const START=new Date().toISOString(), COUNTRY="Iran";
 const CITIES=["Tehran","Isfahan","Tabriz","Mashhad","Shiraz","Ahvaz","Arak","Qazvin","Karaj","Kermanshah"];
 const PRODUCTS=[
- {label:"Carbon Black",key:"carbon-black",industries:["tire manufacturer","rubber products manufacturer","rubber hose manufacturer","rubber belt manufacturer","rubber compound manufacturer"]},
- {label:"Process Oils",key:"process-oils",industries:["tire manufacturer","rubber products manufacturer","rubber compound manufacturer","rubber hose manufacturer"]},
- {label:"Rubber Additives",key:"rubber-additives",industries:["tire manufacturer","rubber compound manufacturer","rubber parts manufacturer","rubber seal manufacturer"]},
- {label:"Silica & Fillers",key:"silica-fillers",industries:["tire manufacturer","rubber compound manufacturer","masterbatch manufacturer","plastic compound manufacturer"]},
- {label:"Polymer Raw Materials",key:"polymer-raw-materials",industries:["plastic products manufacturer","polyethylene film manufacturer","polypropylene products manufacturer","masterbatch manufacturer","plastic pipe manufacturer"]}
+ {label:"Carbon Black",key:"carbon-black",terms:["carbon black","N220","N330","N550","N660"],industries:["tire manufacturer","rubber products manufacturer","rubber hose manufacturer","rubber belt manufacturer","rubber compound manufacturer"]},
+ {label:"Process Oils",key:"process-oils",terms:["rubber process oil","TDAE","MES","naphthenic process oil"],industries:["tire manufacturer","rubber products manufacturer","rubber compound manufacturer","rubber hose manufacturer"]},
+ {label:"Rubber Additives",key:"rubber-additives",terms:["rubber antioxidant","rubber accelerator","CBS","TBBS","TMQ","6PPD"],industries:["tire manufacturer","rubber compound manufacturer","rubber parts manufacturer","rubber seal manufacturer"]},
+ {label:"Silica & Fillers",key:"silica-fillers",terms:["precipitated silica","silica filler","calcium carbonate","kaolin filler"],industries:["tire manufacturer","rubber compound manufacturer","masterbatch manufacturer","plastic compound manufacturer"]},
+ {label:"Polymer Raw Materials",key:"polymer-raw-materials",terms:["polyethylene","polypropylene","HDPE","LDPE","LLDPE","PP resin"],industries:["plastic products manufacturer","polyethylene film manufacturer","polypropylene products manufacturer","masterbatch manufacturer","plastic pipe manufacturer"]}
 ];
 const INSTANCES=(process.env.SEARXNG_INSTANCES||"https://searx.be,https://search.sapti.me,https://searxng.site,https://searx.work,https://search.ononoki.org,https://searx.tuxcloud.net").split(",").map(x=>x.trim()).filter(Boolean);
 const INDUSTRY=/\b(tire|tyre|rubber|hose|belt|seal|gasket|compound|masterbatch|polymer|plastic|polyethylene|polypropylene|pvc|automotive parts|extrusion|injection molding|injection moulding|پلاستیک|لاستیک|تایر|قطعات لاستیکی|مستربچ|پلیمر|شیلنگ|تسمه)\b/i;
@@ -26,9 +26,9 @@ async function search(q){
  for(const host of INSTANCES){try{
   const u=host+"/search?q="+encodeURIComponent(q)+"&format=json&pageno=1";
   const res=await fetch(u,{headers:{"Accept":"application/json","User-Agent":"KeeLead/1.0 industrial buyer research"},signal:AbortSignal.timeout(12000)});
-  if(!res.ok)continue; const data=await res.json(); if(Array.isArray(data.results)&&data.results.length)return data.results;
+  if(!res.ok)continue; const data=await res.json(); if(Array.isArray(data.results))return {results:data.results,ok:true};
  }catch{}}
- return [];
+ return {results:[],ok:false};
 }
 async function inspect(url){
  const out={emails:[],phones:[],title:""};
@@ -46,10 +46,10 @@ async function main(){
  fs.mkdirSync(OUT,{recursive:true});fs.mkdirSync("data",{recursive:true});
  let prior=[];try{prior=JSON.parse(fs.readFileSync(STATE,"utf8"));if(!Array.isArray(prior))prior=[]}catch{}
  const oldKeys=new Set(prior.map(key)), found=new Map();let searchesRun=0,searchErrors=0;
- const tasks=[];for(const p of PRODUCTS)for(const industry of p.industries)for(const city of CITIES)tasks.push({p,industry,city,q:'"'+industry+'" "'+city+'" Iran manufacturer company'});
+ const tasks=[];for(const p of PRODUCTS)for(const city of CITIES){const industry=p.industries.map(x=>String.fromCharCode(34)+x+String.fromCharCode(34)).join(" OR ");const terms=p.terms.map(x=>String.fromCharCode(34)+x+String.fromCharCode(34)).join(" OR ");tasks.push({p,industry,city,q:"("+terms+") ("+industry+") "+city+" Iran"});}
  for(const task of tasks){
-  searchesRun++;const results=await search(task.q);if(!results.length)searchErrors++;
-  for(const item of results){
+  searchesRun++;const response=await search(task.q);if(!response.ok)searchErrors++;
+  for(const item of response.results){
    if(!item?.title||!item?.url)continue;let u;try{u=new URL(item.url)}catch{continue}
    if(!["http:","https:"].includes(u.protocol))continue;
    const d=domain(item.url);if(!d||/(facebook|instagram|linkedin|youtube|tiktok|wikipedia|google|bing|duckduckgo|searx)\./i.test(d))continue;
