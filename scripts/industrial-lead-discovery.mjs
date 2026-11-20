@@ -40,9 +40,8 @@ function parseDuck(html){
  const out=[];for(const m of html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)){
   const href=m[1].match(/\bhref=["']([^"']+)["']/i);if(!href)continue;
   let url=href[1];try{const u=new URL(url,"https://html.duckduckgo.com");if(u.searchParams.has("uddg"))url=u.searchParams.get("uddg");}catch{}
-  const title=clean(m[2]);const tail=html.slice(m.index,m.index+5000);const sm=tail.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\\s\\S]*?)<\\/(?:a|div|td|span)>/i);const content=sm?clean(sm[1]):"";if(title&&/^https?:/i.test(url))out.push({title,url,content});
+  const title=clean(m[2]);const tail=html.slice(m.index,m.index+5000);const sm=tail.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/(?:a|div|td|span)>/i);const content=sm?clean(sm[1]):"";if(title&&/^https?:/i.test(url))out.push({title,url,content});
  }
- return out;
  return out;
 }
 function parseSearx(data){return Array.isArray(data.results)?data.results.filter(x=>x?.title&&x?.url).map(x=>({title:clean(x.title),url:x.url,content:clean(x.content||"")})):[];}
